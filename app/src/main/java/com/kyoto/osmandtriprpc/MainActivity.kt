@@ -41,6 +41,10 @@ class MainActivity : Activity() {
         toggleButton.setOnClickListener {
             if (TripSharingService.isRunning) stopSharing() else ensureNotificationPermissionThenStart()
         }
+        findViewById<Button>(R.id.logs_button).setOnClickListener {
+            startActivity(Intent(this, LogActivity::class.java))
+        }
+        AppLog.info("Main", "activity opened")
     }
 
     override fun onResume() {
@@ -66,18 +70,28 @@ class MainActivity : Activity() {
     }
 
     private fun requestOsmandAccess() {
-        val packageName = OsmandAidlClient(this).resolvePackage()
+        val client = OsmandAidlClient(this)
+        val packageName = client.resolvePackage()
         if (packageName == null) {
+            AppLog.warn("Main", "no OsmAnd AIDL V2 service; installed: ${client.describeInstalledOsmAnd()}")
             Toast.makeText(this, "OsmAnd with the current AIDL API was not found. Update OsmAnd first.", Toast.LENGTH_LONG).show()
             return
         }
+        AppLog.info("Main", "requesting OsmAnd permission groups recording,tracks_view from $packageName")
         val intent = Intent(OsmandAidlClient.PERMISSION_REQUEST_ACTION)
             .setPackage(packageName)
             .putExtra(OsmandAidlClient.EXTRA_GROUPS, REQUIRED_AIDL_GROUPS)
+        val resolved = packageManager.resolveActivity(intent, 0)
+        AppLog.info("Main", "permission dialog resolves to ${resolved?.activityInfo?.name ?: "nothing"}")
+        if (resolved == null) {
+            Toast.makeText(this, "OsmAnd has no permission dialog (update OsmAnd).", Toast.LENGTH_LONG).show()
+            return
+        }
         try {
             @Suppress("DEPRECATION")
             startActivityForResult(intent, REQUEST_OSMAND_PERMISSIONS)
         } catch (e: Exception) {
+            AppLog.error("Main", "OsmAnd permission dialog failed", e)
             Toast.makeText(this, "OsmAnd did not accept the request: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
@@ -92,6 +106,7 @@ class MainActivity : Activity() {
             emptyList()
         }
         val missing = REQUIRED_AIDL_GROUPS.filterNot { it in granted }
+        AppLog.info("Main", "OsmAnd permission result code=$resultCode granted=${granted.joinToString(",").ifEmpty { "none" }}")
         if (missing.isNotEmpty()) {
             detailText.text = "Missing OsmAnd access: ${missing.joinToString(", ")}. " +
                 "Tap “Grant OsmAnd access” and enable both toggles."
@@ -125,6 +140,7 @@ class MainActivity : Activity() {
     }
 
     private fun startSharing() {
+        AppLog.info("Main", "start sharing requested")
         val intent = Intent(this, TripSharingService::class.java)
             .setAction(TripSharingService.ACTION_START)
         if (Build.VERSION.SDK_INT >= 26) {
@@ -135,6 +151,7 @@ class MainActivity : Activity() {
     }
 
     private fun stopSharing() {
+        AppLog.info("Main", "stop sharing requested")
         stopService(Intent(this, TripSharingService::class.java))
     }
 }

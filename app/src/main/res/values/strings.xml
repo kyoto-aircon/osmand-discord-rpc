@@ -5,4 +5,5 @@
     <string name="notification_channel_description">Shows the status that is shared with Discord</string>
     <string name="notification_title">Sharing trip to Discord</string>
     <string name="notification_stop">Stop</string>
+    <string name="logs_title">Logs</string>
 </resources>

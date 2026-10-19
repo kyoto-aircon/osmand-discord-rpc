@@ -168,6 +168,16 @@ class LocalHttpServerTest {
     }
 
     @Test
+    fun countsServedRequests() {
+        val port = startServer("{\"n\":1}")
+        assertEquals(0, server!!.requestCount)
+
+        repeat(3) { parse(send(port, "GET /status HTTP/1.1\r\n\r\n")) }
+
+        assertEquals(3, server!!.requestCount)
+    }
+
+    @Test
     fun stopStopsAcceptingConnections() {
         val port = startServer("{}")
         server!!.stop()

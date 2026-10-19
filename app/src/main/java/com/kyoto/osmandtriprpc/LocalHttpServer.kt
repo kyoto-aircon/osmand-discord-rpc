@@ -21,6 +21,14 @@ class LocalHttpServer(
     private var server: ServerSocket? = null
     private var thread: Thread? = null
     private var workers: java.util.concurrent.ExecutorService? = null
+    private val requestCounter = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /** Total HTTP requests served since the server started (diagnostics). */
+    val requestCount: Int
+        get() = requestCounter.get()
+
+    @Volatile
+    private var lastRequestLogAt = 0L
 
     /** Returns null on success, or an error message. */
     fun start(): String? {
@@ -91,8 +99,26 @@ class LocalHttpServer(
                 else -> try {
                     Response(200, "OK", bodyProvider())
                 } catch (e: Exception) {
+                    AppLog.error("HTTP", "status provider failed", e)
                     Response(500, "Internal Server Error", "{\"error\":\"status unavailable\"}")
                 }
+            }
+
+            // The plugin polls every 2 s; log the first request and then one line per 10 s so the
+            // ring buffer is not consumed by keep-alives, but always log anything non-200.
+            var total = 0
+            val shouldLog = synchronized(this) {
+                total = requestCounter.incrementAndGet()
+                val now = System.currentTimeMillis()
+                if (response.status != 200 || now - lastRequestLogAt >= 10_000L || total == 1) {
+                    lastRequestLogAt = now
+                    true
+                } else {
+                    false
+                }
+            }
+            if (shouldLog) {
+                AppLog.info("HTTP", "$method $path -> ${response.status} (requests=$total)")
             }
 
             val bytes = response.body.toByteArray(Charsets.UTF_8)

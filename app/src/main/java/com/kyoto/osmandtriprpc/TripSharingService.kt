@@ -43,21 +43,32 @@ class TripSharingService : Service() {
     private var pollStarted = false
     private val mainHandler = Handler(Looper.getMainLooper())
     private var lastNotificationText: String? = null
+    private var lastLoggedError: String? = null
+    private var lastLoggedRecording: Boolean? = null
+    private var lastHeartbeatAt = 0L
     private var httpError: String? = null
 
     override fun onCreate() {
         super.onCreate()
+        AppLog.info("Service", "created")
         createNotificationChannel()
         client = OsmandAidlClient(this)
         server = LocalHttpServer(PORT) { JsonStatus.toJson(StatusRepository.current) }
         httpError = server.start()
+        if (httpError == null) {
+            AppLog.info("Service", "HTTP listening on 127.0.0.1:$PORT/status")
+        } else {
+            AppLog.error("Service", "HTTP server failed: $httpError")
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            AppLog.info("Service", "stop action received")
             stopSelf()
             return START_NOT_STICKY
         }
+        AppLog.info("Service", "start command (action=${intent?.action ?: "null"})")
 
         startForegroundCompat(buildNotification(StatusRepository.current))
         isRunning = true
@@ -75,6 +86,7 @@ class TripSharingService : Service() {
     }
 
     override fun onDestroy() {
+        AppLog.info("Service", "destroyed")
         shuttingDown = true
         isRunning = false
         pollStarted = false
@@ -179,8 +191,29 @@ class TripSharingService : Service() {
     )
 
     private fun publish(status: TripStatus) {
+        val errorChanged = status.error != lastLoggedError
+        val recordingChanged = status.recording != lastLoggedRecording
+        if (recordingChanged || errorChanged) {
+            lastLoggedRecording = status.recording
+            lastLoggedError = status.error
+            val suffix = status.error?.let { " error=$it" } ?: ""
+            AppLog.info("Stats", "recording=${status.recording} state=${status.state}$suffix")
+        }
+        maybeHeartbeat(status)
         StatusRepository.update(status)
         mainHandler.post { updateNotification(status) }
+    }
+
+    /**
+     * One line per minute: proves the service is alive and, via the request counter, whether the
+     * Kettu plugin is actually reaching the loopback endpoint (the main unproven link).
+     */
+    private fun maybeHeartbeat(status: TripStatus) {
+        val now = System.currentTimeMillis()
+        if (now - lastHeartbeatAt < 60_000L) return
+        lastHeartbeatAt = now
+        val suffix = httpError?.let { " httpError=$it" } ?: ""
+        AppLog.info("Heartbeat", "state=${status.state} httpRequests=${server.requestCount}$suffix")
     }
 
     private fun updateNotification(status: TripStatus) {

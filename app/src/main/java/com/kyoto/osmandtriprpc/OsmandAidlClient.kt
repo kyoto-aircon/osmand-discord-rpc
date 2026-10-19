@@ -32,6 +32,7 @@ class OsmandAidlClient(private val context: Context) {
         val PREFERRED_PACKAGES = listOf("net.osmand.plus", "net.osmand")
 
         private const val REBIND_DELAY_MS = 3_000L
+        private const val NOT_FOUND_MESSAGE = "OsmAnd with the current AIDL API was not found (update OsmAnd)"
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -53,14 +54,20 @@ class OsmandAidlClient(private val context: Context) {
     @Volatile
     private var rebindPosted = false
 
+    @Volatile
+    private var lastBindLog: String? = null
+
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             bindInFlight = false
+            lastBindLog = null
             api = IOsmAndAidlInterface.Stub.asInterface(service)
             if (api != null) {
                 lastError = null
+                AppLog.info("Aidl", "connected to ${name?.packageName ?: "OsmAnd"}")
             } else {
                 lastError = "OsmAnd returned an empty service handle"
+                AppLog.error("Aidl", lastError!!)
             }
         }
 
@@ -69,13 +76,16 @@ class OsmandAidlClient(private val context: Context) {
             // so re-binding here is redundant (bindService would just return true again).
             api = null
             lastError = "OsmAnd disconnected"
+            AppLog.warn("Aidl", "OsmAnd disconnected")
         }
 
         override fun onBindingDied(name: ComponentName?) {
             api = null
             bindInFlight = false
+            lastBindLog = null
             runCatching { context.unbindService(this) }
             lastError = "OsmAnd connection died"
+            AppLog.warn("Aidl", "OsmAnd connection died, rebinding in 3 s")
             scheduleRebind()
         }
     }
@@ -95,6 +105,19 @@ class OsmandAidlClient(private val context: Context) {
         return PREFERRED_PACKAGES.firstOrNull { it in packagesWithService }
     }
 
+    /**
+     * Debug helper: installed OsmAnd packages and their versions, for the log export.
+     */
+    fun describeInstalledOsmAnd(): String {
+        val pm = context.packageManager
+        return PREFERRED_PACKAGES.mapNotNull { pkg ->
+            runCatching {
+                val info = pm.getPackageInfo(pkg, 0)
+                "$pkg ${info.versionName ?: "?"}"
+            }.getOrNull()
+        }.joinToString(", ").ifEmpty { "none installed" }
+    }
+
     @Synchronized
     fun bindIfNeeded() {
         wantBound = true
@@ -103,10 +126,15 @@ class OsmandAidlClient(private val context: Context) {
         val packageName = resolvePackage()
         if (packageName == null) {
             // No installed OsmAnd advertises the AIDL V2 service; retrying forever cannot help.
-            lastError = "OsmAnd with the current AIDL API was not found (update OsmAnd)"
+            if (lastError != NOT_FOUND_MESSAGE) AppLog.warn("Aidl", NOT_FOUND_MESSAGE)
+            lastError = NOT_FOUND_MESSAGE
             return
         }
 
+        if (lastBindLog != "binding:$packageName") {
+            lastBindLog = "binding:$packageName"
+            AppLog.info("Aidl", "binding to $packageName")
+        }
         val intent = Intent(SERVICE_ACTION).setPackage(packageName)
         var flags = Context.BIND_AUTO_CREATE
         if (Build.VERSION.SDK_INT >= 34) {
@@ -123,12 +151,18 @@ class OsmandAidlClient(private val context: Context) {
         if (!bound) {
             bindInFlight = false
             if (lastError == null) lastError = "Could not bind to OsmAnd"
+            val message = lastError!!
+            if (lastBindLog != message) {
+                lastBindLog = message
+                AppLog.warn("Aidl", message)
+            }
             scheduleRebind()
         }
     }
 
     @Synchronized
     fun unbind() {
+        if (wantBound) AppLog.info("Aidl", "unbound from OsmAnd")
         wantBound = false
         rebindPosted = false
         mainHandler.removeCallbacksAndMessages(null)

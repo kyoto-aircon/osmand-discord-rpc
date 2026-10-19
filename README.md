@@ -21,7 +21,9 @@ Two pieces:
 
 ## Requirements
 
-- Android 7.0+ (GrapheneOS is fine).
+- Android 7.0+ (GrapheneOS is fine). On GrapheneOS, the app needs its **Network** permission
+  toggle enabled (Settings → Apps → OsmAnd Trip RPC → Network); without it, even a loopback
+  socket is refused (`socket failed: EPERM`).
 - OsmAnd (`net.osmand.plus` or `net.osmand`) with the AIDL V2 API — any current store build.
 - [Kettu](https://github.com/C0C0B01/Kettu) for the presence display (Raincord cannot load
   third-party plugins).
@@ -52,6 +54,27 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`.
 The app also shows up under OsmAnd → **Plugins** as a connected app, where the permissions can be
 changed later.
 
+If **Grant OsmAnd access** does nothing, open **View logs** (see below): the app records the
+resolved OsmAnd package, whether OsmAnd advertises the AIDL V2 service, whether the permission
+dialog intent resolves, and the exact groups OsmAnd returned.
+
+## Logs
+
+The app keeps an in-memory log of everything it and its service did since launch: AIDL
+bind/connect/failure, permission requests and results, HTTP server start and every plugin request
+(throttled), state transitions, and a one-line-per-minute heartbeat. Tap **View logs** on the main
+screen to read it; **Copy** puts the whole log plus a header (app version, Android version, device,
+installed OsmAnd version) on the clipboard, **Share** sends it through the system sheet. Lines are
+capped at 500 characters and 800 lines; logs are never uploaded anywhere.
+
+For "the presence does not show up", the key line is the heartbeat/HTTP line:
+
+- `httpRequests=N` in the heartbeat and `GET /status -> 200 (requests=...)` lines mean Kettu is
+  reaching the app; the problem is then on the Discord side (plugin not installed/enabled, or
+  client-side activity hidden).
+- `httpRequests=0` means nothing ever connected: the plugin is not polling, or Discord's process
+  blocks cleartext loopback HTTP.
+
 ## Install the Kettu plugin
 
 This repo is public, so the plugin installs straight from GitHub raw:
@@ -71,7 +94,7 @@ Raincord is not supported: its plugin list is compiled into the client at build 
 Plugins page has no install action. The plugin files themselves are portable — any Kettu/Vendetta
 loader can install them from a URL.
 
-Presence is set while `recording === true`, and cleared within ~2 seconds after the recording
+Presence is set while `recording === true`, and cleared within ~2–3 seconds after the recording
 stops or the app is stopped.
 
 ## HTTP API
