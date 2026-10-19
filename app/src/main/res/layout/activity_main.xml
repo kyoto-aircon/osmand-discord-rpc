@@ -78,7 +78,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"
             android:lineSpacingExtra="4dp"
-            android:text="Setup&#10;1. In OsmAnd, enable the Trip recording plugin and start a recording.&#10;2. Tap “Grant OsmAnd access” and turn on “Trip recording” and “Tracks: view” in OsmAnd’s dialog.&#10;3. Tap “Start sharing”, then enable the Kettu plugin.&#10;&#10;The status shown here is served on 127.0.0.1:8090/status for the Discord mod. Values come straight from OsmAnd’s recording, so they match the in-app status bar.&#10;&#10;Note: keep OsmAnd’s trip recording running; stopping the recording clears your Discord presence. Battery optimisations may stop the share in the background — disable them for this app if that happens."
+            android:text="Setup&#10;1. In OsmAnd, enable the Trip recording plugin and start a recording.&#10;2. Tap “Grant OsmAnd access” and turn on “Trip recording” and “Tracks: view” (only needed on OsmAnd 5.5+).&#10;3. Tap “Start sharing”, allow location, then enable the Kettu plugin.&#10;&#10;The status shown here is served on 127.0.0.1:8090/status for the Discord mod. On OsmAnd 5.5+ the values come from OsmAnd’s recording; on older builds the app uses this phone’s GPS.&#10;&#10;Note: on OsmAnd 5.5+ keep the trip recording running (stopping it clears your Discord presence); on older builds sharing runs until you tap Stop. Battery optimisations may stop the share in the background — disable them for this app if that happens."
             android:textColor="#444444"
             android:textSize="12sp" />
 

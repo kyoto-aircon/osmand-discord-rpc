@@ -15,6 +15,7 @@ class MainActivity : Activity() {
     companion object {
         private const val REQUEST_OSMAND_PERMISSIONS = 1001
         private const val REQUEST_NOTIFICATIONS = 1002
+        private const val REQUEST_LOCATION = 1003
         private val REQUIRED_AIDL_GROUPS = OsmAndPermissions.REQUIRED.toTypedArray()
     }
 
@@ -155,6 +156,15 @@ class MainActivity : Activity() {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIFICATIONS)
             return
         }
+        ensureLocationPermissionThenStart()
+    }
+
+    private fun ensureLocationPermissionThenStart() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            pendingStart = true
+            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCATION)
+            return
+        }
         startSharing()
     }
 
@@ -165,8 +175,13 @@ class MainActivity : Activity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_NOTIFICATIONS && pendingStart) {
-            pendingStart = false
             // Start even if denied: the foreground service still runs, the notification may not show.
+            ensureLocationPermissionThenStart()
+        } else if (requestCode == REQUEST_LOCATION && pendingStart) {
+            pendingStart = false
+            val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+            AppLog.info("Main", "location permission granted=$granted")
+            // Start regardless: without GPS the service can still report OsmAnd stats on 5.5+.
             startSharing()
         }
     }

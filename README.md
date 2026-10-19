@@ -24,7 +24,10 @@ Two pieces:
 - Android 7.0+ (GrapheneOS is fine). On GrapheneOS, the app needs its **Network** permission
   toggle enabled (Settings → Apps → OsmAnd Trip RPC → Network); without it, even a loopback
   socket is refused (`socket failed: EPERM`).
-- OsmAnd (`net.osmand.plus` or `net.osmand`) with the AIDL V2 API — any current store build.
+- OsmAnd 5.5+ for native trip stats (distance/duration/state/speed from the recording). On any
+  older OsmAnd release (including 5.4.x, the current stable), the app automatically falls back to
+  this phone's GPS: speed, distance and elapsed time are computed locally. The OsmAnd trip AIDL
+  API (`getGpxRecordingInfo` etc.) only exists from OsmAnd 5.5-dev, added October 2026.
 - [Kettu](https://github.com/C0C0B01/Kettu) for the presence display (Raincord cannot load
   third-party plugins).
 - Trip recording must be running in OsmAnd while sharing.
@@ -119,13 +122,14 @@ stops or the app is stopped.
 
 ## Caveats
 
-- **Manual stop.** OsmAnd's AIDL API does not expose whether sharing is wanted, so the service is
-  started/stopped from the app (or its notification). It does, however, auto-report
-  `recording:false` when the OsmAnd recording stops, and the presence clears.
+- **Manual stop.** The service is started/stopped from the app (or its notification). On OsmAnd
+  5.5+ it auto-reports `recording:false` when the OsmAnd recording stops and the presence clears.
+  In GPS fallback mode sharing runs until you stop it.
 - **Cleartext loopback.** Android 9+ blocks cleartext HTTP by default, and the fetch runs inside
   Discord's process, not ours. If the activity never appears, check Kettu's logs for
   `[OsmAndTripRPC] status fetch failed`. This is the one unproven link in the chain.
 - **Client-side presence** exists only while Discord/Kettu is running, and is shown by the
   client (same mechanism as Vencord's CustomRPC).
-- Distance is rounded to whole kilometres and speed to whole km/h to match the requested format.
+- **GPS fallback drift.** In fallback mode distance is accumulated from location fixes (accuracy
+  and minimum-step filtering), so it can differ slightly from OsmAnd's track distance.
 - The loopback endpoint is readable by other apps on the device; it contains only trip stats.

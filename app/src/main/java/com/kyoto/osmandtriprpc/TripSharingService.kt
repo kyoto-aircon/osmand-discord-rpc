@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
+import android.location.Location
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -29,6 +30,7 @@ class TripSharingService : Service() {
 
         private const val CHANNEL_ID = "trip_rpc"
         private const val NOTIFICATION_ID = 1
+        private const val GPS_FALLBACK_DELAY_MS = 5_000L
 
         @Volatile
         var isRunning: Boolean = false
@@ -39,9 +41,24 @@ class TripSharingService : Service() {
     private var shuttingDown = false
     private lateinit var client: OsmandAidlClient
     private lateinit var server: LocalHttpServer
+    private lateinit var tracker: LocationTracker
+    private val accumulator = TrackAccumulator()
     private var executor: ScheduledExecutorService? = null
     private var pollStarted = false
+    private var startedAtMs = 0L
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    @Volatile
+    private var gpsMode = false
+
+    @Volatile
+    private var gpsStartedAtMs = 0L
+
+    @Volatile
+    private var gpsDistanceM = 0.0
+
+    @Volatile
+    private var gpsSpeedKmh = 0.0
     private var lastNotificationText: String? = null
     private var lastLoggedError: String? = null
     private var lastLoggedRecording: Boolean? = null
@@ -53,6 +70,7 @@ class TripSharingService : Service() {
         AppLog.info("Service", "created")
         createNotificationChannel()
         client = OsmandAidlClient(this)
+        tracker = LocationTracker(this) { location -> onLocation(location) }
         server = LocalHttpServer(PORT) { JsonStatus.toJson(StatusRepository.current) }
         httpError = server.start()
         if (httpError == null) {
@@ -75,6 +93,7 @@ class TripSharingService : Service() {
 
         if (!pollStarted) {
             pollStarted = true
+            startedAtMs = System.currentTimeMillis()
             client.bindIfNeeded()
             val exec = Executors.newSingleThreadScheduledExecutor { runnable ->
                 Thread(runnable, "trip-rpc-poll")
@@ -92,6 +111,7 @@ class TripSharingService : Service() {
         pollStarted = false
         executor?.shutdownNow()
         executor = null
+        stopGpsMode()
         server.stop()
         client.unbind()
         StatusRepository.update(TripStatus.off())
@@ -107,6 +127,12 @@ class TripSharingService : Service() {
         if (api == null) {
             if (shuttingDown) return
             client.bindIfNeeded()
+            val waited = System.currentTimeMillis() - startedAtMs
+            if (waited >= GPS_FALLBACK_DELAY_MS) {
+                startGpsMode()
+                publishGps()
+                return
+            }
             val message = httpError ?: client.lastError ?: "Waiting for OsmAnd"
             publish(status(state = "WAITING", error = message))
             return
@@ -130,13 +156,20 @@ class TripSharingService : Service() {
         }
 
         if (info == null) {
-            publish(status(state = "WAITING", error = "OsmAnd returned no recording info"))
+            // OsmAnd < 5.5 has no trip-recording AIDL API (it was added in October 2026).
+            // Fall back to this phone's GPS so the presence still works.
+            startGpsMode()
+            publishGps()
             return
         }
+
         if (!info.isRecording) {
+            stopGpsMode()
             publish(status(state = "NOT RECORDING"))
             return
         }
+
+        stopGpsMode()
 
         val total = info.points
         var pointsError: String? = null
@@ -169,6 +202,58 @@ class TripSharingService : Service() {
                 elapsedSeconds = info.duration / 1000L,
                 state = state,
                 error = pointsError,
+                updatedAt = System.currentTimeMillis(),
+            )
+        )
+    }
+
+    private fun startGpsMode() {
+        if (gpsMode) return
+        val error = tracker.start()
+        if (error != null) {
+            publish(status(state = "GPS ERROR", error = error))
+            return
+        }
+        gpsMode = true
+        gpsStartedAtMs = System.currentTimeMillis()
+        accumulator.reset()
+        gpsDistanceM = 0.0
+        gpsSpeedKmh = 0.0
+        AppLog.info("Stats", "GPS fallback active: OsmAnd trip API unavailable (OsmAnd < 5.5)")
+    }
+
+    private fun stopGpsMode() {
+        if (!gpsMode) return
+        gpsMode = false
+        tracker.stop()
+    }
+
+    private fun onLocation(location: Location) {
+        if (!gpsMode) return
+        val update = accumulator.addFix(
+            location.latitude,
+            location.longitude,
+            location.time,
+            if (location.hasAccuracy()) location.accuracy.toDouble() else null,
+            if (location.hasSpeed()) location.speed else null,
+        ) ?: return
+        gpsDistanceM = update.distanceMeters
+        gpsSpeedKmh = update.speedKmh
+    }
+
+    private fun publishGps() {
+        if (!gpsMode) return
+        val elapsedMs = System.currentTimeMillis() - gpsStartedAtMs
+        val state = TripStats.formatStatus(gpsSpeedKmh, gpsDistanceM, elapsedMs)
+        publish(
+            TripStatus(
+                enabled = true,
+                recording = true,
+                speedKmh = Math.round(gpsSpeedKmh.coerceIn(0.0, Int.MAX_VALUE.toDouble())).toInt(),
+                distanceKm = Math.round((gpsDistanceM / 1000.0).coerceIn(0.0, Int.MAX_VALUE.toDouble())).toInt(),
+                elapsedSeconds = elapsedMs / 1000L,
+                state = state,
+                error = null,
                 updatedAt = System.currentTimeMillis(),
             )
         )
@@ -264,7 +349,11 @@ class TripSharingService : Service() {
 
     private fun startForegroundCompat(notification: Notification) {
         if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            )
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }

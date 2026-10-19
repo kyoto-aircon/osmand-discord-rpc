@@ -186,11 +186,18 @@ class OsmandAidlClient(private val context: Context) {
     private fun probeRegistration() {
         val binder = api ?: return
         runCatching { binder.getGpxRecordingInfo() }
-            .onSuccess {
-                AppLog.info("Aidl", "registration probe ok (has recording access)")
+            .onSuccess { info ->
+                AppLog.info(
+                    "Aidl",
+                    if (info == null) {
+                        "registration probe returned null (OsmAnd < 5.5 or access not granted)"
+                    } else {
+                        "registration probe ok (trip API available)"
+                    }
+                )
             }
             .onFailure {
-                AppLog.info("Aidl", "registration probe denied, expected before grant: ${it.message}")
+                AppLog.info("Aidl", "registration probe failed, expected before grant: ${it.message}")
             }
     }
 
