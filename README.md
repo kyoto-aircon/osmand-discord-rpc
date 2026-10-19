@@ -54,9 +54,12 @@ APK: `app/build/outputs/apk/debug/app-debug.apk`.
 The app also shows up under OsmAnd → **Plugins** as a connected app, where the permissions can be
 changed later.
 
-If **Grant OsmAnd access** does nothing, open **View logs** (see below): the app records the
-resolved OsmAnd package, whether OsmAnd advertises the AIDL V2 service, whether the permission
-dialog intent resolves, and the exact groups OsmAnd returned.
+If **Grant OsmAnd access** does nothing, the app now opens OsmAnd's own permission dialog without
+pre-checking it, and logs the candidates it found. If OsmAnd still does not show a dialog, use the
+manual route: tap **Open OsmAnd** → **☰ menu** → **Plugins** → **OsmAnd Trip RPC** → enable it and
+allow **Trip recording** (and **Tracks: view**). The Plugins entry exists once the app has made its
+first AIDL call: opening the app triggers a registration probe, and tapping **Start sharing** also
+does it if needed.
 
 ## Logs
 

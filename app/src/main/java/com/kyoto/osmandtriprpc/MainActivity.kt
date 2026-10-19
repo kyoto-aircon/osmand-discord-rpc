@@ -15,13 +15,14 @@ class MainActivity : Activity() {
     companion object {
         private const val REQUEST_OSMAND_PERMISSIONS = 1001
         private const val REQUEST_NOTIFICATIONS = 1002
-        private val REQUIRED_AIDL_GROUPS = arrayOf("recording", "tracks_view")
+        private val REQUIRED_AIDL_GROUPS = OsmAndPermissions.REQUIRED.toTypedArray()
     }
 
     private lateinit var statusText: TextView
     private lateinit var detailText: TextView
     private lateinit var grantButton: Button
     private lateinit var toggleButton: Button
+    private lateinit var aidlClient: OsmandAidlClient
     private var pendingStart = false
 
     private val statusListener: (TripStatus) -> Unit = { status ->
@@ -37,6 +38,12 @@ class MainActivity : Activity() {
         grantButton = findViewById(R.id.grant_button)
         toggleButton = findViewById(R.id.toggle_button)
 
+        // Binding alone does not create the OsmAnd connected-app entry; the first AIDL call does
+        // (see probeRegistration in OsmandAidlClient). Binding here warms that path so the app
+        // can appear in OsmAnd's Plugins list before sharing starts.
+        aidlClient = OsmandAidlClient(this)
+        aidlClient.bindIfNeeded()
+
         grantButton.setOnClickListener { requestOsmandAccess() }
         toggleButton.setOnClickListener {
             if (TripSharingService.isRunning) stopSharing() else ensureNotificationPermissionThenStart()
@@ -44,6 +51,7 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.logs_button).setOnClickListener {
             startActivity(Intent(this, LogActivity::class.java))
         }
+        findViewById<Button>(R.id.open_osmand_button).setOnClickListener { openOsmAnd() }
         AppLog.info("Main", "activity opened")
     }
 
@@ -56,6 +64,11 @@ class MainActivity : Activity() {
     override fun onPause() {
         StatusRepository.removeListener(statusListener)
         super.onPause()
+    }
+
+    override fun onDestroy() {
+        aidlClient.unbind()
+        super.onDestroy()
     }
 
     private fun render(status: TripStatus) {
@@ -81,19 +94,37 @@ class MainActivity : Activity() {
         val intent = Intent(OsmandAidlClient.PERMISSION_REQUEST_ACTION)
             .setPackage(packageName)
             .putExtra(OsmandAidlClient.EXTRA_GROUPS, REQUIRED_AIDL_GROUPS)
-        val resolved = packageManager.resolveActivity(intent, 0)
-        AppLog.info("Main", "permission dialog resolves to ${resolved?.activityInfo?.name ?: "nothing"}")
-        if (resolved == null) {
-            Toast.makeText(this, "OsmAnd has no permission dialog (update OsmAnd).", Toast.LENGTH_LONG).show()
-            return
-        }
+        val matches = packageManager.queryIntentActivities(intent, 0).map { it.activityInfo.name }
+        AppLog.info("Main", "permission dialog candidates: ${matches.ifEmpty { "none" }}")
         try {
             @Suppress("DEPRECATION")
             startActivityForResult(intent, REQUEST_OSMAND_PERMISSIONS)
         } catch (e: Exception) {
             AppLog.error("Main", "OsmAnd permission dialog failed", e)
-            Toast.makeText(this, "OsmAnd did not accept the request: ${e.message}", Toast.LENGTH_LONG).show()
+            showManualGrantHelp()
         }
+    }
+
+    /**
+     * OsmAnd's permission dialog is missing on some builds. The same result is reachable from
+     * OsmAnd itself once our connected-app entry exists: Plugins -> OsmAnd Trip RPC.
+     */
+    private fun showManualGrantHelp() {
+        detailText.text = "Could not open OsmAnd's permission dialog. Open OsmAnd → ☰ menu → " +
+            "Plugins → “OsmAnd Trip RPC”, enable it, and allow “Trip recording” (and “Tracks: view”). " +
+            "Then come back and tap Start sharing."
+        Toast.makeText(this, "Use OsmAnd → ☰ menu → Plugins → OsmAnd Trip RPC", Toast.LENGTH_LONG).show()
+    }
+
+    private fun openOsmAnd() {
+        val launch = OsmandAidlClient(this).resolvePackage()
+            ?.let { packageManager.getLaunchIntentForPackage(it) }
+        if (launch == null) {
+            Toast.makeText(this, "Could not open OsmAnd", Toast.LENGTH_SHORT).show()
+            return
+        }
+        AppLog.info("Main", "opening OsmAnd")
+        startActivity(launch)
     }
 
     @Deprecated("startActivityForResult is fine here; the app avoids AndroidX on purpose")
@@ -105,11 +136,12 @@ class MainActivity : Activity() {
         } else {
             emptyList()
         }
-        val missing = REQUIRED_AIDL_GROUPS.filterNot { it in granted }
+        val missing = OsmAndPermissions.missing(granted)
         AppLog.info("Main", "OsmAnd permission result code=$resultCode granted=${granted.joinToString(",").ifEmpty { "none" }}")
         if (missing.isNotEmpty()) {
             detailText.text = "Missing OsmAnd access: ${missing.joinToString(", ")}. " +
-                "Tap “Grant OsmAnd access” and enable both toggles."
+                "Tap “Grant OsmAnd access” and enable both toggles, or allow them in " +
+                "OsmAnd → ☰ menu → Plugins → “OsmAnd Trip RPC”."
         } else {
             Toast.makeText(this, "OsmAnd access granted for ${granted.joinToString(", ")}", Toast.LENGTH_LONG).show()
         }

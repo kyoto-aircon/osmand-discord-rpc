@@ -65,6 +65,10 @@ class OsmandAidlClient(private val context: Context) {
             if (api != null) {
                 lastError = null
                 AppLog.info("Aidl", "connected to ${name?.packageName ?: "OsmAnd"}")
+                // Binding alone does not register us in OsmAnd. The connected-app entry is
+                // created on the first AIDL method call (OsmAnd's getOrCreateConnectedApp), so
+                // probe once; before permissions are granted this call is denied, which is fine.
+                probeRegistration()
             } else {
                 lastError = "OsmAnd returned an empty service handle"
                 AppLog.error("Aidl", lastError!!)
@@ -173,6 +177,21 @@ class OsmandAidlClient(private val context: Context) {
 
     fun markError(message: String) {
         lastError = message
+    }
+
+    /**
+     * Triggers OsmAnd's connected-app registration so the app appears in OsmAnd's Plugins list
+     * even before permissions are granted (the first AIDL method call creates the entry).
+     */
+    private fun probeRegistration() {
+        val binder = api ?: return
+        runCatching { binder.getGpxRecordingInfo() }
+            .onSuccess {
+                AppLog.info("Aidl", "registration probe ok (has recording access)")
+            }
+            .onFailure {
+                AppLog.info("Aidl", "registration probe denied, expected before grant: ${it.message}")
+            }
     }
 
     /** Live recording stats straight from OsmAnd's SavingTrackHelper. */
