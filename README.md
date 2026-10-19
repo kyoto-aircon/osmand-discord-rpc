@@ -7,6 +7,11 @@ status bar:
 15KM/H - 50KM - 01:45:23
 ```
 
+Format: speed has at most one decimal (`1.1KM/H`, `55.5KM/H`, `10KM/H`); distance is in metres
+below 1 km (`542M`, `20M`), then in km with at most one decimal (`1.1KM`, `1.5KM`, never `1.51KM`);
+elapsed is `HH:MM:SS`. The plugin puts the trip line in the activity `name`, so it appears on the
+compact Discord presence row without opening the profile.
+
 Two pieces:
 
 - **`app/`** — a small Android app that reads the *live* values of OsmAnd's in-progress trip

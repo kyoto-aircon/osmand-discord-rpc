@@ -36,5 +36,6 @@ loader.
 ## Notes
 
 - The activity is client-side and only visible while Discord/Kettu is running.
-- `state` is the exact string served by the app; `details` is "Trip recording".
+- `state` is the exact string served by the app; `details` is "OsmAnd trip recording".
+- `name` is the same trip string, which is what Discord shows on the compact presence row.
 - Presence is cleared 2 seconds after the recording stops or the app goes away.

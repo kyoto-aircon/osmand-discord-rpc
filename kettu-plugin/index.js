@@ -61,10 +61,12 @@
         try {
             dispatchActivity({
                 application_id: "0",
-                name: "OsmAnd",
+                // Discord shows `name` on the compact presence row, so put the trip line there:
+                // details/state are only visible after opening the profile.
+                name: state,
                 type: 0,
                 flags: 1,
-                details: "Trip recording",
+                details: "OsmAnd trip recording",
                 state: state,
                 timestamps: { start: tripStart },
             });

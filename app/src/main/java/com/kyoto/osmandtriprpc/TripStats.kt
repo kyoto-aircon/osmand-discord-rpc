@@ -27,12 +27,25 @@ object TripStats {
     private const val MIN_TRUSTED_POINT_SPEED_KMH = 0.5
 
     /**
-     * Formats exactly like the user asked: "15KM/H - 50KM - 01:45:23".
+     * Formats the presence line: "15KM/H - 50KM - 01:45:23".
+     * Distance is shown in metres below 1 km, then in km with at most one decimal.
+     * Speed is shown with at most one decimal, and whole numbers drop the ".0".
      */
     fun formatStatus(speedKmh: Double, distanceMeters: Double, durationMs: Long): String {
-        val speed = roundNonNegative(speedKmh)
-        val km = roundNonNegative(distanceMeters / 1000.0)
-        return "${speed}KM/H - ${km}KM - ${formatDuration(durationMs)}"
+        return "${formatSpeed(speedKmh)} - ${formatDistance(distanceMeters)} - ${formatDuration(durationMs)}"
+    }
+
+    fun formatSpeed(kmh: Double): String {
+        val tenths = tenths(kmh)
+        return if (tenths % 10L == 0L) "${tenths / 10}KM/H" else "${tenths / 10}.${tenths % 10}KM/H"
+    }
+
+    fun formatDistance(meters: Double): String {
+        val roundedMeters = roundNonNegative(meters)
+        if (roundedMeters < 1000L) return "${roundedMeters}M"
+        // 100 m per tenth of a kilometre, so the result never has more than one decimal.
+        val tenths = Math.round(roundedMeters / 100.0)
+        return if (tenths % 10L == 0L) "${tenths / 10}KM" else "${tenths / 10}.${tenths % 10}KM"
     }
 
     /** HH:MM:SS; hours are not capped (100h -> "100:00:00"). */
@@ -103,5 +116,11 @@ object TripStats {
     private fun roundNonNegative(value: Double): Long {
         if (!value.isFinite() || value <= 0.0) return 0L
         return Math.round(value)
+    }
+
+    /** Tenths of the unit, so formatting is integer-only and locale-independent. */
+    private fun tenths(value: Double): Long {
+        if (!value.isFinite() || value <= 0.0) return 0L
+        return Math.round(value * 10.0)
     }
 }

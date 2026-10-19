@@ -13,24 +13,52 @@ class TripStatsEdgeCasesTest {
 
     @Test
     fun formatStatusClampsNonFiniteAndNegativeValues() {
-        assertEquals("0KM/H - 0KM - 00:00:00", TripStats.formatStatus(Double.NaN, 0.0, 0L))
+        assertEquals("0KM/H - 0M - 00:00:00", TripStats.formatStatus(Double.NaN, 0.0, 0L))
         assertEquals(
-            "0KM/H - 0KM - 00:00:00",
+            "0KM/H - 0M - 00:00:00",
             TripStats.formatStatus(Double.POSITIVE_INFINITY, Double.NaN, 0L),
         )
         assertEquals(
-            "0KM/H - 0KM - 00:00:00",
+            "0KM/H - 0M - 00:00:00",
             TripStats.formatStatus(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, 0L),
         )
-        assertEquals("0KM/H - 0KM - 00:00:00", TripStats.formatStatus(-12.0, -500.0, -1L))
+        assertEquals("0KM/H - 0M - 00:00:00", TripStats.formatStatus(-12.0, -500.0, -1L))
     }
 
     @Test
     fun formatStatusRoundsHalfUpAtBoundaries() {
-        assertEquals("1KM/H - 1KM - 00:00:00", TripStats.formatStatus(0.5, 500.0, 0L))
-        assertEquals("0KM/H - 0KM - 00:00:00", TripStats.formatStatus(0.499, 499.0, 0L))
-        assertEquals("2KM/H - 2KM - 00:00:00", TripStats.formatStatus(1.5, 1_500.0, 0L))
-        assertEquals("50KM/H - 50KM - 00:00:00", TripStats.formatStatus(49.5, 49_501.0, 0L))
+        assertEquals("0.5KM/H - 500M - 00:00:00", TripStats.formatStatus(0.5, 500.0, 0L))
+        assertEquals("0.5KM/H - 499M - 00:00:00", TripStats.formatStatus(0.499, 499.0, 0L))
+        assertEquals("1.5KM/H - 1.5KM - 00:00:00", TripStats.formatStatus(1.5, 1_500.0, 0L))
+        assertEquals("49.5KM/H - 49.5KM - 00:00:00", TripStats.formatStatus(49.5, 49_501.0, 0L))
+    }
+
+    @Test
+    fun formatsDistanceInMetresBelowOneKilometre() {
+        assertEquals("542M", TripStats.formatDistance(542.0))
+        assertEquals("20M", TripStats.formatDistance(20.0))
+        assertEquals("999M", TripStats.formatDistance(999.4))
+        assertEquals("0M", TripStats.formatDistance(0.0))
+    }
+
+    @Test
+    fun formatsDistanceWithAtMostOneDecimal() {
+        assertEquals("1KM", TripStats.formatDistance(999.6))
+        assertEquals("1.1KM", TripStats.formatDistance(1_100.0))
+        assertEquals("1.5KM", TripStats.formatDistance(1_510.0))
+        assertEquals("1.5KM", TripStats.formatDistance(1_514.0))
+        assertEquals("10KM", TripStats.formatDistance(10_000.0))
+        assertEquals("11KM", TripStats.formatDistance(10_999.0))
+    }
+
+    @Test
+    fun formatsSpeedWithAtMostOneDecimal() {
+        assertEquals("1.1KM/H", TripStats.formatSpeed(1.1))
+        assertEquals("55.5KM/H", TripStats.formatSpeed(55.5))
+        assertEquals("10KM/H", TripStats.formatSpeed(10.0))
+        assertEquals("10KM/H", TripStats.formatSpeed(10.04))
+        assertEquals("0KM/H", TripStats.formatSpeed(0.0))
+        assertEquals("0KM/H", TripStats.formatSpeed(Double.NaN))
     }
 
     @Test

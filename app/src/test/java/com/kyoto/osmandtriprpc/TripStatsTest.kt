@@ -9,20 +9,20 @@ class TripStatsTest {
     @Test
     fun formatsTheRequestedStatusLine() {
         assertEquals(
-            "15KM/H - 50KM - 01:45:23",
+            "15.4KM/H - 50.3KM - 01:45:23",
             TripStats.formatStatus(speedKmh = 15.4, distanceMeters = 50_321.0, durationMs = 6_323_000L),
         )
     }
 
     @Test
     fun formatsZeroValues() {
-        assertEquals("0KM/H - 0KM - 00:00:00", TripStats.formatStatus(0.0, 0.0, 0L))
+        assertEquals("0KM/H - 0M - 00:00:00", TripStats.formatStatus(0.0, 0.0, 0L))
     }
 
     @Test
     fun roundsSpeedAndDistance() {
-        assertEquals("15KM/H - 1KM - 00:00:00", TripStats.formatStatus(14.6, 500.0, 0L))
-        assertEquals("14KM/H - 0KM - 00:00:00", TripStats.formatStatus(14.4, 499.0, 0L))
+        assertEquals("14.6KM/H - 500M - 00:00:00", TripStats.formatStatus(14.6, 500.0, 0L))
+        assertEquals("14.4KM/H - 499M - 00:00:00", TripStats.formatStatus(14.4, 499.0, 0L))
     }
 
     @Test

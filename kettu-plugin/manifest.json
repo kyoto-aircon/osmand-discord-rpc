@@ -3,6 +3,6 @@
   "description": "Shows your live OsmAnd trip recording (speed, distance, elapsed) as Discord rich presence.",
   "authors": [{ "name": "kyoto-aircon" }],
   "main": "index.js",
-  "hash": "332a029dc68b2da691f6c27b0df1f3cf828924c07516ca2e7975efaf656a404d",
+  "hash": "6c0ea615da37635142134d392e4a717dfe97eb098eab3c12f20bb27ca44419e9",
   "vendetta": { "icon": "ic_navigation_24px" }
 }
