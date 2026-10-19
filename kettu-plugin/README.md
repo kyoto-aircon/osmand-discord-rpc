@@ -1,4 +1,4 @@
-# OsmAnd Trip RPC — Raincord plugin
+# OsmAnd Trip RPC — Kettu plugin
 
 Shows the live OsmAnd trip recording (`15KM/H - 50KM - 01:45:23`) as Discord rich presence.
 
@@ -8,12 +8,23 @@ the same mechanism Vencord's CustomRPC uses.
 
 ## Install
 
-Kettu installs plugins from a URL to a folder containing `manifest.json` and `index.js`.
-Host this folder somewhere reachable from your phone (any static host, or a public gist),
-then use Kettu's plugin installer with the manifest URL.
+This repo is public, so Kettu can install straight from GitHub raw:
 
-If your Kettu build supports installing from a local file, use `manifest.json` + `index.js`
-directly — no build step is required.
+```
+https://raw.githubusercontent.com/kyoto-aircon/osmand-discord-rpc/main/kettu-plugin/
+```
+
+1. Install Kettu (KettuManager for non-root, KettuXposed for root).
+2. Settings → General → enable **Developer Settings**.
+3. Settings → Plugins → floating **+** (or **Install a plugin**).
+4. Paste the URL above — a folder URL; the installer appends `manifest.json` and `index.js`.
+5. Accept the unproxied-source warning.
+
+No build step: `index.js` is a hand-written Kettu bundle (`manifest.json` hash matches it).
+
+**Raincord is not supported.** Raincord compiles its plugin list into the client and has no
+third-party plugin installer; use Kettu. The files are portable to any Kettu/Vendetta-family
+loader.
 
 ## Requirements
 

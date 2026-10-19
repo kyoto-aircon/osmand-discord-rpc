@@ -6,14 +6,15 @@ This plan was AI-generated with minimal to no oversight.
 - **Goal**: live OsmAnd trip stats as Discord rich presence, `15KM/H - 50KM - 01:45:23`.
 - **Architecture (final, revised during build)**: companion Android app reading OsmAnd's live
   recording via AIDL (`getGpxRecordingInfo` + `getGpxPoints("")`) — *no own GPS*; loopback HTTP
-  server; Kettu/Raincord plugin polling it and setting `LOCAL_ACTIVITY_UPDATE`.
+  server; Kettu plugin polling it and setting `LOCAL_ACTIVITY_UPDATE`. (Raincord cannot load
+  third-party plugins — its plugin list is compiled in — so Kettu is the supported client.)
 - **In scope**: Android app (zero runtime deps beyond the vendored OsmAnd AIDL jar), permission
   request flow through OsmAnd's own dialog, foreground service + notification, `/status` JSON,
-  Raincord plugin, private GitHub release with APK.
+  Kettu plugin, public GitHub release with APK.
 - **Out of scope**: own GPS (rejected after discovering exact AIDL stats), OsmAnd fork, cloud
   polling, desktop Vencord relay, auto-start.
 - **Done**: app appears in OsmAnd plugins, requests `recording` + `tracks_view`, serves live
-  status, Raincord shows the activity line, build+tests pass, private release published.
+  status, Kettu shows the activity line, build+tests pass, public release published.
 - **Open risk**: cleartext HTTP to 127.0.0.1 from Discord's process (unproven; documented).
 
 ## 2. Findings
@@ -34,10 +35,10 @@ This plan was AI-generated with minimal to no oversight.
 3. `TripStats` (pure formatting/geometry) + unit tests.
 4. `OsmandAidlClient` (dual package bind, rebind), `LocalHttpServer`, `TripSharingService`,
    `MainActivity` (grant + toggle).
-5. Raincord plugin (`index.js`, `manifest.json`, README).
+5. Kettu plugin (`index.js`, `manifest.json`, README).
 6. Build + unit tests green; APK produced.
 7. Tester + review subagents, fixes, commit, private GitHub repo + release.
 
 ## 4. Files
 
-See repo tree: `app/`, `raincord-plugin/`, `README.md`, `plan.md`, `.gitignore`.
+See repo tree: `app/`, `kettu-plugin/`, `README.md`, `plan.md`, `.gitignore`.
